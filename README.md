@@ -11,6 +11,9 @@
   - [4. 目标2: 创建`Eureka`注册中心](#4-目标2-创建eureka注册中心)
     - [4.1 子目标1: 创建`Eureka`注册中心工程 - 子](#41-子目标1-创建eureka注册中心工程---子)
     - [4.2 子目标2: 将`provider`注册到`Eureka`](#42-子目标2-将provider注册到eureka)
+  - [5. 目标3: `consumer` 访问 `provider` 时使用微服务名称代替 `localhost:1000`](#5-目标3-consumer-访问-provider-时使用微服务名称代替-localhost1000)
+    - [5.1 分析](#51-分析)
+    - [5.2 操作](#52-操作)
 
 # 十四 SpringCloud
 
@@ -51,7 +54,7 @@
 
 - 20220809
 
-    - 2021.0.3 最低支持 `SpringBoot` **2.6.8 版本**
+  - 2021.0.3 最低支持 `SpringBoot` **2.6.8 版本**
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660007197186-787ae2c9-7265-4b5f-bc14-450eaa1d5ce7.png)
 
@@ -440,4 +443,106 @@ spring:
   application:
     # 指定当前微服务的名称, 以便将来通过微服务名称调用当前微服务时能够找到
     name: atguigu-provider
+```
+
+## 5. 目标3: `consumer` 访问 `provider` 时使用微服务名称代替 `localhost:1000`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660227535977-f8efc026-73a9-4620-ae4c-06e34c318bb6.png)
+
+```java
+package com.atguigu.spring.cloud.handler;
+
+import com.atguigu.spring.cloud.entity.Employee;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+@RestController
+public class HumanResourceHandler {
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    @RequestMapping("/consumer/get/employee")
+    public Employee getEmployeeRemote() {
+        // 声明远程微服务的主机地址 + 端口号
+        // String host = "http://localhost:1000";
+
+        // 声明远程微服务调用地址从 `IP地址 + 端口号` 改成 `服务器名称`
+        String host = "http://atguigu-provider";
+        
+        // 声明具体要调用的功能的 Url 地址
+        String url = "/provider/get/employee/remote";
+
+        // 通过 RestTemplate 调用远程微服务
+        return restTemplate.getForObject(host + url, Employee.class);
+    }
+
+}
+```
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660227984063-d4621a5a-f2e0-497d-b11e-8111db7f1839.png)
+
+------
+
+### 5.1 分析
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660217224462-8c9d0474-0818-4404-b27b-fe429aa869e0.png)
+
+
+
+### 5.2 操作
+
+- 在 `consumer` 工程加入依赖
+
+```xml
+<dependency>
+  <groupId>org.springframework.cloud</groupId>
+  <artifactId>spring-cloud-starter-netflix-ribbon</artifactId>
+</dependency>
+<dependency>
+  <groupId>org.springframework.cloud</groupId>
+  <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+```
+
+
+
+-  `application.yml` 追加配置
+
+```yaml
+spring:
+  application:
+    name: atguigu-consumer
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:5000/eureka
+```
+
+
+
+- 在 `RestTemplate` 的配置方法处使用 `@LoadBalanced` 注解
+
+```java
+package com.atguigu.spring.cloud.config;
+
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
+
+@Configuration
+public class AtguiguSpringCloudConfig {
+
+    // 这个注解让 RestTemplate 有负载均衡功能, 通过调用 Ribbon 访问 Provider 集群
+    @LoadBalanced
+    @Bean
+    public RestTemplate getRestTemplate() {
+        return new RestTemplate();
+    }
+
+}
 ```

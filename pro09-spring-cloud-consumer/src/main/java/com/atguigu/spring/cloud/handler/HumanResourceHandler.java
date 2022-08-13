@@ -15,7 +15,10 @@ public class HumanResourceHandler {
     @RequestMapping("/consumer/get/employee")
     public Employee getEmployeeRemote() {
         // 声明远程微服务的主机地址 + 端口号
-        String host = "http://localhost:1000";
+        // String host = "http://localhost:1000";
+
+        // 声明远程微服务调用地址从 `IP地址 + 端口号` 改成 `服务器名称`
+        String host = "http://atguigu-provider";
 
         // 声明具体要调用的功能的 Url 地址
         String url = "/provider/get/employee/remote";
