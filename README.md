@@ -1,20 +1,21 @@
 - [十四 SpringCloud](#十四-springcloud)
-    - [1. SpringCloud 组件](#1-springcloud-组件)
-    - [2. SpringCloud 版本说明](#2-springcloud-版本说明)
-    - [3. 目标1: 准备基础测试环境](#3-目标1-准备基础测试环境)
-        - [3.1 结构](#31-结构)
-        - [3.2 创建父工程](#32-创建父工程)
-            - [3.2.1 `pom.xml` 文件配置](#321-pomxml-文件配置)
-        - [3.3 创建通用工程 - 子](#33-创建通用工程---子)
-        - [3.4 创建提供者工程 - 子](#34-创建提供者工程---子)
-        - [3.5 创建消费者工程 - 子](#35-创建消费者工程---子)
+  - [1. SpringCloud 组件](#1-springcloud-组件)
+  - [2. SpringCloud 版本说明](#2-springcloud-版本说明)
+  - [3. 目标1: 准备基础测试环境](#3-目标1-准备基础测试环境)
+    - [3.1 结构](#31-结构)
+    - [3.2 创建父工程](#32-创建父工程)
+      - [3.2.1 `pom.xml` 文件配置](#321-pomxml-文件配置)
+    - [3.3 创建通用工程 - 子](#33-创建通用工程---子)
+    - [3.4 创建提供者工程 - 子](#34-创建提供者工程---子)
+    - [3.5 创建消费者工程 - 子](#35-创建消费者工程---子)
+  - [4. 目标2: 创建`Eureka`注册中心](#4-目标2-创建eureka注册中心)
+    - [4.1 子目标1: 创建`Eureka`注册中心工程 - 子](#41-子目标1-创建eureka注册中心工程---子)
+    - [4.2 子目标2: 将`provider`注册到`Eureka`](#42-子目标2-将provider注册到eureka)
 
 # 十四 SpringCloud
 
->SpringCloud 核心  -
->- 基于 `HTTP` 协议,  这是它和 `Dubbo` 最本质的区别。`Dubbo` 的核心是基于 `RPC`
-
-
+> SpringCloud 核心 -
+>- 基于 `HTTP` 协议, 这是它和 `Dubbo` 最本质的区别。`Dubbo` 的核心是基于 `RPC`
 
 ## 1. SpringCloud 组件
 
@@ -34,11 +35,7 @@
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660006005060-1f674eeb-cd8c-4b5d-8380-7586d26a2b19.png)
 
-
-
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660006040099-0a58c5cd-ce4e-4799-acc5-7ebe598302f3.png)
-
-
 
 - `Hystrix`
 
@@ -47,8 +44,6 @@
 - `Zuul`统一的一个入口
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660006320992-c5dffbcb-596c-4806-bb21-0d201d584dce.png)
-
-
 
 ## 2. SpringCloud 版本说明
 
@@ -60,8 +55,6 @@
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660007197186-787ae2c9-7265-4b5f-bc14-450eaa1d5ce7.png)
 
-
-
 ## 3. 目标1: 准备基础测试环境
 
 `git checkout -b 14.0.0_spring_cloud`
@@ -69,8 +62,6 @@
 ### 3.1 结构
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660032190626-e8e7c6c1-cc13-4bb5-b294-88d521f8131a.png)
-
-
 
 ### 3.2 创建父工程
 
@@ -85,6 +76,7 @@
 #### 3.2.1 `pom.xml` 文件配置
 
 ```xml
+
 <dependencyManagement>
     <dependencies>
         <!-- 导入 SpringCloud 需要使用的依赖信息 -->
@@ -107,8 +99,6 @@
     </dependencies>
 </dependencyManagement>
 ```
-
-
 
 ### 3.3 创建通用工程 - 子
 
@@ -172,8 +162,6 @@ public class Employee {
 }
 ```
 
-
-
 ### 3.4 创建提供者工程 - 子
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660222032565-65e55157-6b22-4b60-bb68-f67fad6d8749.png)
@@ -189,6 +177,7 @@ public class Employee {
 - `pom.xml`
 
 ```xml
+
 <dependencies>
     <dependency>
         <groupId>org.springframework.boot</groupId>
@@ -247,8 +236,6 @@ public class EmployeeHandler {
 }
 ```
 
-
-
 ### 3.5 创建消费者工程 - 子
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660221999435-ce6d2813-8941-4501-ba62-e2ebfff5c2c8.png)
@@ -264,6 +251,7 @@ public class EmployeeHandler {
 - `pom.xml`
 
 ```xml
+
 <dependencies>
     <dependency>
         <groupId>org.springframework.boot</groupId>
@@ -353,3 +341,103 @@ server:
   port: 4000
 ```
 
+## 4. 目标2: 创建`Eureka`注册中心
+
+### 4.1 子目标1: 创建`Eureka`注册中心工程 - 子
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660223802061-1d75ed71-6fd9-42d1-9987-8898e3166844.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660224553003-0da8f73d-b5f7-4b9f-af21-4a01329be157.png)
+
+------
+
+- `Artifact Id`: `pro10-spring-cloud-eureka`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660313092409-d434ba93-6cd2-46c0-a198-349a45865547.png)
+
+- 加入依赖信息
+
+```xml
+
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+    </dependency>
+</dependencies>
+```
+
+- 创建主启动类
+
+```java
+package com.atguigu.spring.cloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.eureka.server.EnableEurekaServer;
+
+// 启用 Eureka 服务器功能
+@EnableEurekaServer
+@SpringBootApplication
+public class AtguiguMainType {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AtguiguMainType.class, args);
+    }
+
+}
+```
+
+- 创建 `application.yml`
+
+```yaml
+server:
+  port: 5000
+
+eureka:
+  instance:
+    hostname: location
+  client:
+    # 自己就是注册中心, 所以自己不注册自己
+    register-with-eureka: false
+    # 自己就是注册中心, 所以不需要"从注册中心取回信息"
+    fetch-registry: false
+    # 客户端访问 Eureka 时使用的地址
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka
+```
+
+### 4.2 子目标2: 将`provider`注册到`Eureka`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660225306101-05ca8475-73bb-486a-b7eb-e38e09fbd89d.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660226837746-600feb6e-3c57-467a-aadd-f1d16df23f6f.png)
+
+
+
+------
+
+- 加入依赖
+
+```xml
+
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+```
+
+- `application.yml`追加配置
+
+```yaml
+eureka:
+  client:
+    service-url:
+      # 配置当前微服务作为 Eureka 客户端访问 Eureka 服务器端时使用的地址
+      defaultZone: http://localhost:5000/eureka
+
+spring:
+  application:
+    # 指定当前微服务的名称, 以便将来通过微服务名称调用当前微服务时能够找到
+    name: atguigu-provider
+```
