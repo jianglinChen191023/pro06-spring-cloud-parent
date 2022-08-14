@@ -14,6 +14,16 @@
   - [5. 目标3: `consumer` 访问 `provider` 时使用微服务名称代替 `localhost:1000`](#5-目标3-consumer-访问-provider-时使用微服务名称代替-localhost1000)
     - [5.1 分析](#51-分析)
     - [5.2 操作](#52-操作)
+  - [6. 目标4: `provider`以集群方式启动](#6-目标4-provider以集群方式启动)
+    - [6.1 修改`provider`的`handler`方法 (显示端口号)](#61-修改provider的handler方法-显示端口号)
+    - [6.2 打包](#62-打包)
+    - [6.3 `provider`以集群方式启动](#63-provider以集群方式启动)
+    - [6.4 `consumer` 正常访问](#64-consumer-正常访问)
+    - [6.5 注意](#65-注意)
+  - [扩展](#扩展)
+  - [1.下面两个注解功能大致相同:](#1下面两个注解功能大致相同)
+    - [1.1 @EnableDiscoveryClient](#11-enablediscoveryclient)
+    - [1.2 @EnableEurekaClient](#12-enableeurekaclient)
 
 # 十四 SpringCloud
 
@@ -546,3 +556,105 @@ public class AtguiguSpringCloudConfig {
 
 }
 ```
+
+## 6. 目标4: `provider`以集群方式启动
+
+### 6.1 修改`provider`的`handler`方法 (显示端口号)
+
+```java
+package com.atguigu.spring.cloud.handler;
+
+import com.atguigu.spring.cloud.entity.Employee;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.servlet.http.HttpServletRequest;
+
+@RestController
+public class EmployeeHandler {
+
+    @RequestMapping("/provider/get/employee/remote")
+    public Employee getEmployeeRemote(HttpServletRequest request) {
+        // 获取当前 Web 应用的端口号
+        int serverPort = request.getServerPort();
+        return new Employee(555, "tom555 " + serverPort, 555.55);
+    }
+
+}
+```
+
+
+
+### 6.2 打包
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660518605808-d72cab49-6bb1-4ef4-96be-727d645c040f.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660519838846-58645523-5290-4e40-b3d5-f0a87d95ed2b.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660519851566-f352cae2-b5e5-4574-9b92-a3e25ac285ef.png)
+
+- pom 追加配置
+
+```xml
+<build>
+    <plugins>
+        <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>repackage</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+```
+
+- 启动: `nohup java -jar xxx.jar > log.out &`
+
+
+
+### 6.3 `provider`以集群方式启动
+
+- 安装端口号 1000 启动第一个实例
+- 安装端口号 2000 启动第二个实例
+- 安装端口号 3000 启动第三个实例
+
+
+
+1. 先启动 `pro10-spring-cloud-eureka`
+2. 再启动 `pro08-spring-cloud-provider`, 修改 `prot` 后再启动
+  1. 1000
+  2. 2000
+  3. 3000
+3. 启动 `pro09-spring-cloud-consumer`
+
+### 6.4 `consumer` 正常访问
+
+- 轮询 `prorider`1000、2000、3000
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660520667653-dac393a4-54bd-484b-ad2e-cf35459cad01.png)
+
+
+
+### 6.5 注意
+
+- privider 的微服务名称必须使用**同一个名称**才能构建一个集群, 否则将不会认定为是属于同一个集群
+
+
+
+## 扩展
+
+## 1.下面两个注解功能大致相同:
+
+### 1.1 @EnableDiscoveryClient
+
+启用发现服务功能, 不局限于 Eureka 注册中心
+
+### 1.2 @EnableEurekaClient
+
+启用 Eureka 客户端功能, 必须是 Eureka 注册中心
