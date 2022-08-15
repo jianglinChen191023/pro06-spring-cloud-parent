@@ -24,6 +24,19 @@
   - [1.下面两个注解功能大致相同:](#1下面两个注解功能大致相同)
     - [1.1 @EnableDiscoveryClient](#11-enablediscoveryclient)
     - [1.2 @EnableEurekaClient](#12-enableeurekaclient)
+- [十五 Feign、Hystrix、Zuul](#十五-feignhystrixzuul)
+  - [1. `Feign`](#1-feign)
+    - [1.1 `Feign` 用法及介绍](#11-feign-用法及介绍)
+      - [1.1.1 `Feign` 介绍](#111-feign-介绍)
+      - [1.1.2 `Feign` 的用法](#112-feign-的用法)
+    - [1.2 使用 `Fengn` 实战](#12-使用-fengn-实战)
+    - [1.2.1 `common` 工程](#121-common-工程)
+    - [1.2.2 `provider` 工程](#122-provider-工程)
+    - [1.2.3 新建一个 `consumer` 工程](#123-新建一个-consumer-工程)
+    - [1.2.4 `Feign` 传参中需要注意的地方](#124-feign-传参中需要注意的地方)
+      - [1.2.4.1 如果删除 `Common` 中 `@RequestParam("keyword") `](#1241-如果删除-common-中-requestparamkeyword-)
+      - [1.2.4.2 如果删除 `Provider` 中 `@RequestParam("keyword")`](#1242-如果删除-provider-中-requestparamkeyword)
+      - [1.2.4.3 如果删除 `Commin、Provider` 中 `@RequestParam("keyword")`](#1243-如果删除-comminprovider-中-requestparamkeyword)
 
 # 十四 SpringCloud
 
@@ -658,3 +671,342 @@ public class EmployeeHandler {
 ### 1.2 @EnableEurekaClient
 
 启用 Eureka 客户端功能, 必须是 Eureka 注册中心
+
+
+# 十五 Feign、Hystrix、Zuul
+
+```
+git checkout -b 15.0.0_fergn_hystrix_zuul
+```
+
+
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660521409650-deb62b3f-fac4-454d-bbb8-da2914275c75.png)
+
+## 1. `Feign`
+
+### 1.1 `Feign` 用法及介绍
+
+#### 1.1.1 `Feign` 介绍
+
+- `feign`是声明式的`web service`客户端，它让微服务之间的调用变得更简单了，类似`controller`调用`service`。
+- `Spring Cloud`集成了`Ribbon`和`Eureka`，可在使用`Feign`时提供负载均衡的`http`客户端。
+
+#### 1.1.2 `Feign` 的用法
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660524601756-c5fbd39c-5f14-4ca6-997c-0f6ef0dc05b7.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660524616245-dcb9b3d0-47c0-4dd6-877a-840480cea487.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660524722041-2f7c4a71-4b95-439e-8a33-7595c4b98877.png)
+
+
+
+### 1.2 使用 `Fengn` 实战
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660531700636-b1256df1-b11d-4a16-9db8-7d379e475025.png)
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1660532017546-fc0ed3a9-cfe7-4938-8376-9db3e2b3af90.jpeg)
+
+
+
+### 1.2.1 `common` 工程
+
+- 导入依赖
+
+```xml
+<dependencies>
+  <dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-openfeign</artifactId>
+  </dependency>
+</dependencies>
+  
+```
+
+- 创建远程调用方法的接口
+
+```java
+package com.atguigu.spring.cloud.api;
+
+import com.atguigu.spring.cloud.entity.Employee;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+/**
+ * `@FeignClient` 注解表示当前接口和一个 Provider 对应, 注解中 value 属性指定要调用的 Provider 的微服务名称
+ *
+ * @author chenjianglin
+ * @date 2022/8/15 09:00
+ */
+@FeignClient("atguigu-provider")
+public interface EmployeeRemoteService {
+
+    /**
+     * 远程调用的接口方法
+     * 要求 `@RequestMapping` 注解映射的地址一致
+     * 要求方法声明一致
+     * 用来获取请求参数、`@RequestParam`、`@PathVariable`、`@RequestBody` 不能省略, 两边一致
+     * 
+     * @return
+     */
+    @RequestMapping("/provider/get/employee/remote")
+    Employee getEmployeeRemote();
+    
+}
+```
+
+
+
+### 1.2.2 `provider` 工程
+
+- `EmployeeHandler`
+
+```java
+package com.atguigu.spring.cloud.handler;
+
+import com.atguigu.spring.cloud.entity.Employee;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class EmployeeHandler {
+
+    @RequestMapping("/provider/get/employee/remote")
+    public Employee getEmployeeRemote() {
+        return new Employee(555, "tom555 ", 555.55);
+    }
+
+    /*    @RequestMapping("/provider/get/employee/remote")
+    public Employee getEmployeeRemote(HttpServletRequest request) {
+        // 获取当前 Web 应用的端口号
+        int serverPort = request.getServerPort();
+        return new Employee(555, "tom555 " + serverPort, 555.55);
+    }*/
+
+}
+```
+
+
+
+### 1.2.3 新建一个 `consumer` 工程
+
+- `pro09-spring-cloud-feign-consumer`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660530448195-015198dd-1f79-4b10-ac8a-5291119d2f38.png)
+
+- `pom.xml`
+
+```xml
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.atguigu.spring.cloud</groupId>
+            <artifactId>pro07-spring-cloud-common</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+```
+
+- 主启动类
+
+```java
+package com.atguigu.spring.cloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+
+/**
+ * `@EnableFeignClients` 启用 Feign 客户端功能
+ *
+ * @author chenjianglin
+ * @date 2022/8/15 10:11
+ */
+@EnableFeignClients
+@SpringBootApplication
+public class AtguiguMainType {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AtguiguMainType.class, args);
+    }
+    
+}
+```
+
+- applicatoin.yml
+
+```yaml
+server:
+  port: 7000
+spring:
+  application:
+    name: atguigu-feign-consumer
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:5000/eureka
+```
+
+
+
+- `FeignHumanResourceHandler.java`
+
+```java
+package com.atguigu.spring.cloud.handler;
+
+import com.atguigu.spring.cloud.api.EmployeeRemoteService;
+import com.atguigu.spring.cloud.entity.Employee;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * @author chenjianglin
+ * @date 2022/8/15 10:13
+ */
+@RestController
+public class FeignHumanResourceHandler {
+
+    /**
+     * 转配调用远程微服务的接口, 后面向调用本地方法一样直接使用
+     */
+    @Autowired
+    private EmployeeRemoteService employeeRemoteService;
+
+    @RequestMapping("/feign/consumer/get/emp")
+    public Employee getEmployeeRemote() {
+        return employeeRemoteService.getEmployeeRemote();
+    }
+    
+}
+```
+
+
+
+### 1.2.4 `Feign` 传参中需要注意的地方
+
+- `FeignHumanResourceHandler` - `consumer`
+
+```java
+@RequestMapping("/feign/consumer/search")
+public List<Employee> getEmpListRemote(String keyword) {
+    return employeeRemoteService.getEmpListRemote(keyword);
+}
+```
+
+- `EmployeeRemoteService` - `common`
+
+```java
+@RequestMapping("/provider/get/emp/list/remote")
+List<Employee> getEmpListRemote(@RequestParam("keyword") String keyword);
+```
+
+- `EmployeeHandler` - `provider`
+
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+    private Logger logger = LoggerFactory.getLogger(EmployeeHandler.class);
+    
+    @RequestMapping("/provider/get/emp/list/remote")
+    public List<Employee> getEmpListRemote(@RequestParam("keyword") String keyword) {
+        
+        logger.info("keyword=" + keyword);
+        
+        List<Employee> empList = new ArrayList<>();
+        empList.add(new Employee(33, "empName33", 333.33));
+        empList.add(new Employee(44, "empName44", 444.44));
+        empList.add(new Employee(55, "empName55", 555.55));
+        
+        return empList;
+    }
+```
+
+- 访问
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660535154104-9cf73404-17be-4e3a-9931-4c97ccc63035.png)
+
+- 等待一会就可以了, 服务注册发现需要一点时间
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660534872334-604fb4cf-c39a-4e39-bc84-7b11c709b3c1.png)
+
+
+
+##### 1.2.4.1 如果删除 `Common` 中 `@RequestParam("keyword") `
+
+```java
+@RequestMapping("/provider/get/emp/list/remote")
+List<Employee> getEmpListRemote(String keyword);
+```
+
+- 报错信息:
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660535663703-6b7adec8-c00c-4d72-ac7e-6665bcbe7f0c.png)
+
+- 一个 500; 一个400
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1660536644061-d45d1aee-7058-455a-9b59-4e4b1efd99f2.jpeg)
+
+- 400 `provider` 的报错信息: 参数问题
+
+  - ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660536227622-9e8dfe61-d71f-4e8b-bb58-af7fc0cd56e2.png)
+
+- 500
+
+  - ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660536516800-2b9e2acf-450c-4ea6-acb1-9d6426c87fc2.png)
+
+
+
+##### 1.2.4.2 如果删除 `Provider` 中 `@RequestParam("keyword")`
+
+```java
+    @RequestMapping("/provider/get/emp/list/remote")
+    public List<Employee> getEmpListRemote(String keyword) {
+
+        logger.info("keyword=" + keyword);
+
+        List<Employee> empList = new ArrayList<>();
+        empList.add(new Employee(33, "empName33", 333.33));
+        empList.add(new Employee(44, "empName44", 444.44));
+        empList.add(new Employee(55, "empName55", 555.55));
+
+        return empList;
+    }
+```
+
+- 访问成功
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660561304169-a795d4bc-42e2-408b-a468-c141895d0339.png)
+
+
+
+##### 1.2.4.3 如果删除 `Commin、Provider` 中 `@RequestParam("keyword")`
+
+- 参数获取失败为 `null`
