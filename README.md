@@ -37,6 +37,25 @@
       - [1.2.4.1 如果删除 `Common` 中 `@RequestParam("keyword") `](#1241-如果删除-common-中-requestparamkeyword-)
       - [1.2.4.2 如果删除 `Provider` 中 `@RequestParam("keyword")`](#1242-如果删除-provider-中-requestparamkeyword)
       - [1.2.4.3 如果删除 `Commin、Provider` 中 `@RequestParam("keyword")`](#1243-如果删除-comminprovider-中-requestparamkeyword)
+  - [2. `Hystrix`](#2-hystrix)
+    - [2.1 分布式系统面临的问题](#21-分布式系统面临的问题)
+    - [2.2 `Hystrix` 介绍](#22-hystrix-介绍)
+      - [2.2.1 `Hystrix` 有什么用](#221-hystrix-有什么用)
+    - [2.3 服务熔断机制](#23-服务熔断机制)
+      - [2.3.1 依赖信息(`provider`)](#231-依赖信息provider)
+      - [2.3.2 主启动类(`provider`)](#232-主启动类provider)
+      - [2.3.3 ResultEntity(`common`)](#233-resultentitycommon)
+      - [2.3.4 `handler` 方法(`provider`)](#234-handler-方法provider)
+    - [2.4 服务降级机制](#24-服务降级机制)
+      - [2.4.1 `common` 工程: 依赖](#241-common-工程-依赖)
+      - [2.4.2 `common` 工程: `FallbackFactory`](#242-common-工程-fallbackfactory)
+      - [2.4.3 `common` 工程: `Feign` 接口](#243-common-工程-feign-接口)
+      - [2.4.4 `consumer` 工程: `FeignHumanResourceHandler` 和 `application.yml`](#244-consumer-工程-feignhumanresourcehandler-和-applicationyml)
+      - [2.4.5 测试 关闭 `provider` 服务, 测试降级](#245-测试-关闭-provider-服务-测试降级)
+    - [2.5 `Hystrix` 监控仪表盘](#25-hystrix-监控仪表盘)
+      - [2.5.1 `provider` 工程](#251-provider-工程)
+      - [2.5.2 监控工程](#252-监控工程)
+      - [2.5.3 查看监控数据](#253-查看监控数据)
 
 # 十四 SpringCloud
 
@@ -1010,3 +1029,597 @@ List<Employee> getEmpListRemote(String keyword);
 ##### 1.2.4.3 如果删除 `Commin、Provider` 中 `@RequestParam("keyword")`
 
 - 参数获取失败为 `null`
+
+
+## 2. `Hystrix`
+
+### 2.1 分布式系统面临的问题
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660561731485-3a38b969-c81a-4685-bf41-a69c582caa45.png)
+
+
+
+- 在微服务架构体系下, 服务间调用错综复杂, 交织成一张大网
+- 如果其中某个节点突然无法正常工作, 则访问它的众多服务都会被卡住, 进而有更多服务被卡住, 系统中的线程、CPU、内存等资源有可能被迅速耗尽、最终整个服务体系崩溃
+- 我们称这样的现象叫`**服务雪崩**`
+- CAP: CAP 三个里面不能同时都满足
+
+  - C 一致性
+  - A 可用性
+  - **P 分区容错性**
+
+
+
+### 2.2 `Hystrix` 介绍
+
+- `Hystrix` 是一个用于处理分布式系统的延迟和容错的开源库, 在分布式系统里, 许多依赖不可避免的会调用失败, 比如超时、异常等, `Hystriy` 能够保证在一个依赖出问题的情况下, 不会导致整体服务失败, 避免级联故障, 以提高分布式系统的弹性
+- "断路器" 本身是一种开关装置, 当某服务单元发生故障之后, 通过断路器的故障检测（类似于熔断保险丝）, 向调用方法返回一个符合预期的、可处理的备选响应（`FallBack`）, 而不是长时间的等待或者抛出调用无法处理的异常, 这样就保证了服务调用方的线程不会被长时间、不必要地占用, 从而避免故障在分布式系统中的蔓延, 乃至雪崩
+
+#### 2.2.1 `Hystrix` 有什么用
+
+`Hystrix`能够提供服务降级、服务熔断、服务限流、接近实时的监控等方面的功能
+
+
+
+### 2.3 服务熔断机制
+
+- 熔断机制是应对雪崩效应的一种微服务链路保护机制
+- 当扇出链路的某个微服务不可以或者响应时间太长时, 会进行服务的降级、进而熔断该节点微服务的调用, 快速响应错误信息。
+
+- 当检测到该节点微服务调用响应正常后恢复调用链路
+  - 在 `SpringCloud` 框架里熔断机制通过 `Hystrix` 实现
+  - `Hystrix` 会监控微服务间调用的状况, 当失败的调用到一定阈值, 缺省是 5 秒内 20 次调用失败就会启动熔断机制
+
+- 熔断机制的注解是 `@HystrixCommand`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660564449594-926188ba-b098-4fa9-be4d-9af11427fbe8.png)
+
+
+
+#### 2.3.1 依赖信息(`provider`)
+
+```xml
+<dependency>
+  <groupId>org.springframework.cloud</groupId>
+  <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+</dependency>
+```
+
+
+
+#### 2.3.2 主启动类(`provider`)
+
+```java
+package com.atguigu.spring.cloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+
+/**
+ * ## 1.下面两个注解功能大致相同:
+ * ### 1.1 @EnableDiscoveryClient
+ * 启用发现服务功能, 不局限于 Eureka 注册中心
+ * ### 1.2 @EnableEurekaClient
+ * 启用 Eureka 客户端功能, 必须是 Eureka 注册中心
+ * 
+ * `@EnableCircuitBreaker` 注解开启断路器功能
+ */
+@EnableCircuitBreaker
+@SpringBootApplication
+public class AtguiguMainType {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AtguiguMainType.class, args);
+    }
+
+}
+```
+
+
+
+#### 2.3.3 ResultEntity(`common`)
+
+```java
+package com.atguigu.spring.cloud.util;
+
+/**
+ * 整个项目统一使用这个类型作为 Ajax 请求或远程方法调用返回响应的数据格式
+ * 
+ * @author chenjianglin
+ * @date 2022/8/16 10:14
+ */
+public class ResultEntity<T> {
+    
+    private String result;
+    private String message;
+    private T data;
+
+    public ResultEntity() {
+
+    }
+
+    public ResultEntity(String result, String message, T data) {
+        super();
+        this.result = result;
+        this.message = message;
+        this.data = data;
+    }
+
+    public static final String SUCCESS = "SUCCESS";
+    public static final String FAILED = "FAILED";
+    public static final String NO_MESSAGE = "NO_MESSAGE";
+    public static final String NO_DATA = "NO_DATA";
+
+    /**
+     * 操作成功, 不需要返回数据
+     * 
+     * @return
+     */
+    public static ResultEntity<String> successWithoutData() {
+        return new ResultEntity<String>(SUCCESS, NO_MESSAGE, NO_DATA);
+    }
+
+    /**
+     * 操作成功, 需要返回数据
+     * 
+     * @param data
+     * @param <E>
+     * @return
+     */
+    public static <E> ResultEntity<E> successWithData(E data) {
+        return new ResultEntity<>(SUCCESS, NO_MESSAGE, data);
+    }
+
+    /**
+     * 操作失败, 返回错误数据
+     * 
+     * @param message
+     * @param <E>
+     * @return
+     */
+    public static <E> ResultEntity<E> failed(String message) {
+        return new ResultEntity<>(FAILED, message, null);
+    }
+
+    @Override
+    public String toString() {
+        return "ResultEntity{" +
+                "result='" + result + '\'' +
+                ", message='" + message + '\'' +
+                ", data=" + data +
+                '}';
+    }
+
+    public String getResult() {
+        return result;
+    }
+
+    public void setResult(String result) {
+        this.result = result;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public T getData() {
+        return data;
+    }
+
+    public void setData(T data) {
+        this.data = data;
+    }
+    
+}
+```
+
+
+
+#### 2.3.4 `handler` 方法(`provider`)
+
+```java
+/**
+ * `@HystrixCommand` 注解通过 fallbackMethod 属性指定断路情况下要调用的备份方法
+ * `@HystrixCommand` 注解指定当前方法出问题时调用的备份方法（使用 fallbackMethod 属性指定）
+ *
+ * @param signal
+ * @return
+ */
+@HystrixCommand(fallbackMethod="getEmpWithCircuitBreakerBackup")
+@RequestMapping("/provider/get/emp/with/circuit/breaker")
+public ResultEntity<Employee> getEmpWithCircuitBreaker(@RequestParam("signal") String signal) throws InterruptedException {
+
+    if("quick-bang".equals(signal)) {
+        throw new RuntimeException();
+    }
+
+    if("slow-bang".equals(signal)) {
+        Thread.sleep(5000);
+    }
+
+    return ResultEntity.successWithData(new Employee(666, "empName666", 666.66));
+}
+
+public ResultEntity<Employee> getEmpWithCircuitBreakerBackup(@RequestParam("signal") String signal) {
+    return ResultEntity.failed("方法执行出现问题, 执行断路 signal: " + signal);
+}
+```
+
+- 正常 `127.0.0.1:1000/provider/get/emp/with/circuit/breaker?signal=22`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660625534881-47a37806-d2b6-4816-b60a-b4b4034d57c1.png)
+
+- 异常 `127.0.0.1:1000/provider/get/emp/with/circuit/breaker?signal=quick-bang`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660625606875-ecd42c01-5334-4432-8c54-d7aeb0842f8e.png)
+
+- 超时`127.0.0.1:1000/provider/get/emp/with/circuit/breaker?signal=slow-bang`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660625824498-ca3dca15-dfed-4c23-84e5-8202483cba0b.png)
+
+
+
+### 2.4 服务降级机制
+
+- 服务降级处理是在客户端（`Consumer` 端）实现完成的, 与服务端（`Provider` 端）没有关系
+- 当某个 `Consumer` 访问一个 `Provider` 却迟迟等不到响应时执行预先设定好的一个解决方案, 而不是一直等待
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1660627763409-40cc9257-29c4-4a4b-8d43-50efad8d2261.jpeg)
+
+
+
+#### 2.4.1 `common` 工程: 依赖
+
+```xml
+<dependency>
+  <groupId>org.springframework.cloud</groupId>
+  <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+</dependency>
+```
+
+
+
+#### 2.4.2 `common` 工程: `FallbackFactory`
+
+- 请注意自动扫描包的规则
+- 比如: `feign-consumer` 工程需要使用 `MyFallBackFactory`,
+
+  - 那么 `MyFallBackFactory` 应该在 `feign-consumer` 工程的主启动类所在包或它的子包下
+  - 简单来说: 哪个工程用这个类, 哪个工程必须想办法扫描到这个类
+
+```java
+package com.atguigu.spring.cloud.factory;
+
+import com.atguigu.spring.cloud.api.EmployeeRemoteService;
+import com.atguigu.spring.cloud.entity.Employee;
+import com.atguigu.spring.cloud.util.ResultEntity;
+import feign.hystrix.FallbackFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * 实现 Consumer 端服务降级功能
+ * 实现 FallbackFactory 接口时要传入 @FeignClient 接口类型
+ * 在 create() 方法中返回 @FeignClient 注解标记的接口类型对象, 当 Provider 调用失败后, 会执行这个对象的对应方法
+ * 这个类必须使用 @Component 注解将当前的对象加入 IOC 容器, 当然当前类必须能够被扫描到
+ *
+ * @author chenjianglin
+ * @date 2022/8/16 13:41
+ */
+@Component
+public class MyFallBackFactory implements FallbackFactory<EmployeeRemoteService> {
+    // cause 对象是失败原因对于的异常对象
+    @Override
+    public EmployeeRemoteService create(Throwable cause) {
+        return new EmployeeRemoteService() {
+
+            @Override
+            public Employee getEmployeeRemote() {
+                return null;
+            }
+
+            @Override
+            public List<Employee> getEmpListRemote(String keyword) {
+                return null;
+            }
+
+            @Override
+            public ResultEntity<Employee> getEmpWithCircuitBreaker(String signal) {
+                return ResultEntity.failed("降级机制生效: " + cause.getMessage());
+            }
+        };
+    }
+}
+```
+
+
+
+- `EmployeeRemoteService` 追加 `getEmpWithCircuitBreaker`
+
+```java
+package com.atguigu.spring.cloud.api;
+
+import com.atguigu.spring.cloud.entity.Employee;
+import com.atguigu.spring.cloud.util.ResultEntity;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+
+/**
+ * `@FeignClient` 注解表示当前接口和一个 Provider 对应, 注解中 value 属性指定要调用的 Provider 的微服务名称
+ *
+ * @author chenjianglin
+ * @date 2022/8/15 09:00
+ */
+@FeignClient("atguigu-provider")
+public interface EmployeeRemoteService {
+
+    /**
+     * 远程调用的接口方法
+     * 要求 `@RequestMapping` 注解映射的地址一致
+     * 要求方法声明一致
+     * 用来获取请求参数、`@RequestParam`、`@PathVariable`、`@RequestBody` 不能省略, 两边一致
+     *
+     * @return
+     */
+    @RequestMapping("/provider/get/employee/remote")
+    Employee getEmployeeRemote();
+
+    @RequestMapping("/provider/get/emp/list/remote")
+    List<Employee> getEmpListRemote(@RequestParam("keyword") String keyword);
+
+    @RequestMapping("/provider/get/emp/with/circuit/breaker")
+    ResultEntity<Employee> getEmpWithCircuitBreaker(@RequestParam("signal") String signal);
+
+}
+```
+
+
+
+#### 2.4.3 `common` 工程: `Feign` 接口
+
+- 在 `@FeignClient` 注解中增加 `fallbackFactory` 属性
+
+```java
+package com.atguigu.spring.cloud.api;
+
+import com.atguigu.spring.cloud.entity.Employee;
+import com.atguigu.spring.cloud.factory.MyFallBackFactory;
+import com.atguigu.spring.cloud.util.ResultEntity;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+
+/**
+ * `@FeignClient` 注解表示当前接口和一个 Provider 对应, 
+ *      注解中 value 属性指定要调用的 Provider 的微服务名称
+ *      注解中 fallbackFactory 属性指定 Provider 不可用时提供备用方案的工厂类型
+ * @author chenjianglin
+ * @date 2022/8/15 09:00
+ */
+@FeignClient(value = "atguigu-provider", fallbackFactory = MyFallBackFactory.class)
+public interface EmployeeRemoteService {
+
+    /**
+     * 远程调用的接口方法
+     * 要求 `@RequestMapping` 注解映射的地址一致
+     * 要求方法声明一致
+     * 用来获取请求参数、`@RequestParam`、`@PathVariable`、`@RequestBody` 不能省略, 两边一致
+     *
+     * @return
+     */
+    @RequestMapping("/provider/get/employee/remote")
+    Employee getEmployeeRemote();
+
+    @RequestMapping("/provider/get/emp/list/remote")
+    List<Employee> getEmpListRemote(@RequestParam("keyword") String keyword);
+
+    @RequestMapping("/provider/get/emp/with/circuit/breaker")
+    ResultEntity<Employee> getEmpWithCircuitBreaker(@RequestParam("signal") String signal);
+
+}
+```
+
+
+
+#### 2.4.4 `consumer` 工程: `FeignHumanResourceHandler` 和 `application.yml`
+
+```java
+package com.atguigu.spring.cloud.handler;
+
+import com.atguigu.spring.cloud.api.EmployeeRemoteService;
+import com.atguigu.spring.cloud.entity.Employee;
+import com.atguigu.spring.cloud.util.ResultEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * @author chenjianglin
+ * @date 2022/8/15 10:13
+ */
+@RestController
+public class FeignHumanResourceHandler {
+
+    /**
+     * 转配调用远程微服务的接口, 后面向调用本地方法一样直接使用
+     */
+    @Autowired
+    private EmployeeRemoteService employeeRemoteService;
+
+    @RequestMapping("/feign/consumer/get/emp")
+    public Employee getEmployeeRemote() {
+        return employeeRemoteService.getEmployeeRemote();
+    }
+
+    @RequestMapping("/feign/consumer/search")
+    public List<Employee> getEmpListRemote(String keyword) {
+        return employeeRemoteService.getEmpListRemote(keyword);
+    }
+
+    @RequestMapping("/feign/consumer/test/fallback")
+    public ResultEntity<Employee> testFallBack(@RequestParam("signal") String signal) {
+        return employeeRemoteService.getEmpWithCircuitBreaker(signal);
+    }
+
+}
+feign:
+  hystrix:
+    enabled: true
+```
+
+
+
+#### 2.4.5 测试 关闭 `provider` 服务, 测试降级
+
+- 访问: `127.0.0.1:7000/feign/consumer/test/fallback?signal=111`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660631164708-77884776-8b3a-424b-9494-349a5e1ab28b.png)
+
+```plain
+{"result":"FAILED","message":"降级机制生效: 拒绝连接 (Connection refused) executing GET http://atguigu-provider/provider/get/emp/with/circuit/breaker?signal=111","data":null}
+```
+
+
+
+### 2.5 `Hystrix` 监控仪表盘
+
+#### 2.5.1 `provider` 工程
+
+- 依赖
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+- 配置
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure: 
+        include: hystrix.stream
+```
+
+
+
+#### 2.5.2 监控工程
+
+- `pro11-spring-cloud-dashboard`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660654459477-1a131f37-2799-4f5b-88c6-463a220460aa.png)
+
+- 依赖
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-boot-starter-netflix-hystrix-dashboard</artifactId>
+    </dependency>
+</dependencies>
+
+<build>
+    <plugins>
+        <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>repackage</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+```
+
+- 启动 `Hystrix` 仪表盘功能
+
+```java
+package com.atguigu.spring.cloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.hystrix.dashboard.EnableHystrixDashboard;
+
+/**
+ * `@EnableHystrixDashboard` 启动 Hystrix 仪表盘功能
+ * @author chenjianglin
+ * @date 2022/8/16 20:56
+ */
+@EnableHystrixDashboard
+@SpringBootApplication
+public class AtguiguMainType {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AtguiguMainType.class, args);
+    }
+
+}
+```
+
+- 配置
+
+```yaml
+server:
+  port: 8000
+spring:
+  application:
+    name: atguigu-dashboard
+```
+
+
+
+#### 2.5.3 查看监控数据
+
+- 直接查看监控数据本身
+
+  - `http://localhost:1000/actuator/hystrix.stream`
+
+    - 说明1: `http://localhost:1000 `访问的是被监控的 `provider` 工程
+    - 说明2: `/actuator/hystrix.stream` 是固定格式
+    - 说明3: 如果从 `provider` 启动开始它的方法没有被访问过, 那么显示的数据只有 "`ping`:", 要实际访问一个带熔断功能的方法才会有实际数据
+
+  - \1. 访问 `127.0.0.1:1000/provider/get/emp/with/circuit/breaker?signal=111`
+  - \2. 访问 `http://localhost:1000/actuator/hystrix.stream`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660662097985-0e5d2175-380f-4d58-a707-f9cd8aac4f90.png)
+
+
+
+- 通过仪表盘工程访问监控数据
+
+  - 第一步: 打开仪表盘工程的首页
+
+    - `http://localhost:8000/hystrix`
+
+  - 第二步: 填入获取监控数据的地址（上面直接查看时使用的地址）
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660659016012-0d10a04b-0f1c-41e5-8320-8e95b4956896.png)
+
+- 填入 `http://localhost:1000/actuator/hystrix.stream`
+- 点击按钮 `Monitor Stream`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660662233486-d2f2c084-a767-4ea7-8adb-dcf4a957cbbc.png)
+
