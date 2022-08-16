@@ -1,6 +1,8 @@
 package com.atguigu.spring.cloud.handler;
 
 import com.atguigu.spring.cloud.entity.Employee;
+import com.atguigu.spring.cloud.util.ResultEntity;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,6 +40,32 @@ public class EmployeeHandler {
         empList.add(new Employee(55, "empName55", 555.55));
 
         return empList;
+    }
+
+    /**
+     * `@HystrixCommand` 注解通过 fallbackMethod 属性指定断路情况下要调用的备份方法
+     * `@HystrixCommand` 注解指定当前方法出问题时调用的备份方法（使用 fallbackMethod 属性指定）
+     *
+     * @param signal
+     * @return
+     */
+    @HystrixCommand(fallbackMethod="getEmpWithCircuitBreakerBackup")
+    @RequestMapping("/provider/get/emp/with/circuit/breaker")
+    public ResultEntity<Employee> getEmpWithCircuitBreaker(@RequestParam("signal") String signal) throws InterruptedException {
+
+        if("quick-bang".equals(signal)) {
+            throw new RuntimeException();
+        }
+
+        if("slow-bang".equals(signal)) {
+            Thread.sleep(5000);
+        }
+
+        return ResultEntity.successWithData(new Employee(666, "empName666", 666.66));
+    }
+
+    public ResultEntity<Employee> getEmpWithCircuitBreakerBackup(@RequestParam("signal") String signal) {
+        return ResultEntity.failed("方法执行出现问题, 执行断路 signal: " + signal);
     }
 
 }
