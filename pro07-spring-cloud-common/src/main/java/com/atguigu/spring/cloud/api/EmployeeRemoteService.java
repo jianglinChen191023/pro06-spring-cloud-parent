@@ -1,6 +1,8 @@
 package com.atguigu.spring.cloud.api;
 
 import com.atguigu.spring.cloud.entity.Employee;
+import com.atguigu.spring.cloud.factory.MyFallBackFactory;
+import com.atguigu.spring.cloud.util.ResultEntity;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -8,12 +10,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 
 /**
- * `@FeignClient` 注解表示当前接口和一个 Provider 对应, 注解中 value 属性指定要调用的 Provider 的微服务名称
- *
+ * `@FeignClient` 注解表示当前接口和一个 Provider 对应,
+ *      注解中 value 属性指定要调用的 Provider 的微服务名称
+ *      注解中 fallbackFactory 属性指定 Provider 不可用时提供备用方案的工厂类型
  * @author chenjianglin
  * @date 2022/8/15 09:00
  */
-@FeignClient("atguigu-provider")
+@FeignClient(value = "atguigu-provider", fallbackFactory = MyFallBackFactory.class)
 public interface EmployeeRemoteService {
 
     /**
@@ -29,5 +32,8 @@ public interface EmployeeRemoteService {
 
     @RequestMapping("/provider/get/emp/list/remote")
     List<Employee> getEmpListRemote(@RequestParam("keyword") String keyword);
+
+    @RequestMapping("/provider/get/emp/with/circuit/breaker")
+    ResultEntity<Employee> getEmpWithCircuitBreaker(@RequestParam("signal") String signal);
 
 }

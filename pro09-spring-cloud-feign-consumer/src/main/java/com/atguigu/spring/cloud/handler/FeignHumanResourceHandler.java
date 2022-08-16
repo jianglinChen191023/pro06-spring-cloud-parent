@@ -2,8 +2,10 @@ package com.atguigu.spring.cloud.handler;
 
 import com.atguigu.spring.cloud.api.EmployeeRemoteService;
 import com.atguigu.spring.cloud.entity.Employee;
+import com.atguigu.spring.cloud.util.ResultEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -29,6 +31,11 @@ public class FeignHumanResourceHandler {
     @RequestMapping("/feign/consumer/search")
     public List<Employee> getEmpListRemote(String keyword) {
         return employeeRemoteService.getEmpListRemote(keyword);
+    }
+
+    @RequestMapping("/feign/consumer/test/fallback")
+    public ResultEntity<Employee> testFallBack(@RequestParam("signal") String signal) {
+        return employeeRemoteService.getEmpWithCircuitBreaker(signal);
     }
 
 }
