@@ -56,6 +56,18 @@
       - [2.5.1 `provider` 工程](#251-provider-工程)
       - [2.5.2 监控工程](#252-监控工程)
       - [2.5.3 查看监控数据](#253-查看监控数据)
+  - [3. `Zuul`](#3-zuul)
+    - [3.1 `Zuul` 简介](#31-zuul-简介)
+    - [3.2 创建 `Zuul` 工程](#32-创建-zuul-工程)
+    - [3.3  访问测试](#33--访问测试)
+      - [3.3.1 初步访问](#331-初步访问)
+      - [3.3.2 使用指定地址代替微服务名称](#332-使用指定地址代替微服务名称)
+      - [3.3.3 让用户不能通过微服务名称访问](#333-让用户不能通过微服务名称访问)
+      - [3.3.4 忽略所有微服务名称](#334-忽略所有微服务名称)
+      - [3.3.5 给访问路径添加统一前缀](#335-给访问路径添加统一前缀)
+      - [3.3.6 加一个 `context-path`](#336-加一个-context-path)
+    - [3.4 `ZuulFilter` 过滤器功能](#34-zuulfilter-过滤器功能)
+      - [3.4.1 使用 `ZuulFilter`](#341-使用-zuulfilter)
 
 # 十四 SpringCloud
 
@@ -1623,3 +1635,278 @@ spring:
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660662233486-d2f2c084-a767-4ea7-8adb-dcf4a957cbbc.png)
 
+
+## 3. `Zuul`
+
+### 3.1 `Zuul` 简介
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1660663306035-7eae08af-14ce-4c78-b44c-fb581629896d.jpeg)
+
+
+
+- 不同的微服务一般不同的网络地址, 而外部的客户端可能需要调用多个服务接口才能完成一个业务需求
+
+  - 比如一个电影购票的手机 App, 可能会调用电影分类微服务, 用户微服务， 支付微服务等
+  - 如果客户端直接和微服务进行通信, 会存在以下问题
+
+1. 客户端会多次请求不同微服务, 增加客户端的复杂性
+2. 存在跨域请求, 在一定场景下处理相对复杂
+3. 认证复杂, 每一个服务都需要独立认证
+4. 难以重构, 随着项目的迭代, 可能需要重新划分微服务, 如果客户端直接和微服务通信, 那么重构会难以实施
+5. 某些微服务可能使用了其他协议, 直接访问有一定困难
+
+
+
+- `Zull` 包含了对请求的**路由**和**过滤**两个最主要的功能
+
+  - 路由功能: 负责对外部请求转发到具体的微服务实例上, 是实现外部访问统一入口的基础
+  - 过滤器功能: 负责对请求的处理过程进行干预, 是实现请求校验、服务聚合等功能的基础
+
+- `Zull` 和 `Eureka` 进行整合, 将 `Zull` 自身注册为 `Eureka` 服务治理下的应用, 同时从 `Eureka` 中获取其他微服务的信息, 也既以后的访问微服务都是通过 `Zuul` 跳转后获得
+- 总的来说, `Zuul` 提供了**代理**、**路由**和**过滤**的功能
+
+![img](https://cdn.nlark.com/yuque/0/2022/jpeg/12811585/1660667792171-a0bc9bac-7b22-47d4-90ca-38f47e2a53c8.jpeg)
+
+
+
+### 3.2 创建 `Zuul` 工程
+
+- pro12-spring-cloud-zuul
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660671114942-541d1af9-d9ba-4c64-bad5-c5f715c09c7e.png)
+
+- 依赖
+
+```xml
+<dependencies>
+  <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+  </dependency>
+  <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-netflix-zuul</artifactId>
+  </dependency>
+</dependencies>
+
+<build>
+    <plugins>
+        <!-- 这个插件将 SpringBoot 应用打包成一个可执行的 jar 包 -->
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>repackage</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+```
+
+- 配置
+
+```yaml
+server:
+  port: 9000
+  
+spring:
+  application:
+    name: zuul-gateway
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:5000/eureka
+```
+
+- 主启动类
+
+```java
+package com.atguigu.spring.cloud;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
+
+/**
+ * `@EnableZuulProxy` 启用 Zuul 代理功能
+ * 
+ * @author chenjianglin
+ * @date 2022/8/17 02:03
+ */
+@EnableZuulProxy
+@SpringBootApplication
+public class AtguiguMainType {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AtguiguMainType.class, args);
+    }
+
+}
+```
+
+
+
+### 3.3  访问测试
+
+#### 3.3.1 初步访问
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660674029660-1d0d6ed0-298d-405b-aa23-82b87258242c.png)
+
+- 此时: 通过 Zuul 可以访问, 也可以不经过 Zuul 直接访问目标微服务
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660675051733-6129a903-1ca1-44eb-9e7f-4d8659c220d1.png)
+
+
+
+#### 3.3.2 使用指定地址代替微服务名称
+
+- 配置
+
+```yaml
+zuul:
+  routes:
+    # 自定义路由规则的名称, 在底层的数据结构中是 Map 的键
+    employee:
+      # 目标微服务名称, ZuulRoute 类型的一个属性
+      service-id: atguigu-feign-consumer
+      # 用来代替目标微服务名称的路径
+      # /** 表示匹配多层路径, 如果没有加 /**, 则不能匹配后续的多层路径了
+      path: /zuul-emp/**
+```
+
+- 效果: 使用微服务名称和新配置的地址都可以访问
+
+  - `http://localhost:9000/atguigu-feign-consumer/feign/consumer/get/emp`
+  - `http://localhost:9000/zuul-emp/feign/consumer/get/emp`
+
+
+
+#### 3.3.3 让用户不能通过微服务名称访问
+
+- 配置
+
+```yaml
+zuul:
+  ignored-services:
+    -atguigu-feign-consumer
+```
+
+
+
+#### 3.3.4 忽略所有微服务名称
+
+```yaml
+zuul:
+  # 忽略所有微服务名称
+  ignored-services: '*'
+```
+
+
+
+#### 3.3.5 给访问路径添加统一前缀
+
+```yaml
+zuul:
+  # 给访问路径添加统一前缀
+  prefix: /atguigu
+```
+
+- `http://localhost:9000/atguigu/zuul-emp/feign/consumer/get/emp`
+
+#### 3.3.6 加一个 `context-path`
+
+```yaml
+server:
+  servlet:
+    context-path: /xigua
+```
+
+- `http://localhost:9000/xigua/atguigu/zuul-emp/feign/consumer/get/emp`
+
+
+
+### 3.4 `ZuulFilter` 过滤器功能
+
+- 扩展
+
+  - 转发只允许在一个 Web 应用内部
+  - 重定向允许所有
+
+
+
+#### 3.4.1 使用 `ZuulFilter`
+
+```java
+package com.atguigu.spring.cloud.filter;
+
+import com.netflix.zuul.ZuulFilter;
+import com.netflix.zuul.context.RequestContext;
+import com.netflix.zuul.exception.ZuulException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import javax.servlet.http.HttpServletRequest;
+
+/**
+ * @author chenjianglin
+ * @date 2022/8/17 10:13
+ */
+@Component
+public class MyZuulFilter extends ZuulFilter {
+
+    Logger logger = LoggerFactory.getLogger(MyZuulFilter.class);
+
+    @Override
+    public String filterType() {
+        // 返回当前过滤器的类型, 决定当前过滤器在什么时候执行
+        // pre 表示在目标微服务前执行
+        return "pre";
+    }
+
+    @Override
+    public int filterOrder() {
+        return 0;
+    }
+
+    /**
+     * 判断当前请求是否要进行过滤
+     * - 要过滤: 继续执行 run() 方法
+     * - 不过滤: 直接放行
+     *
+     * @return
+     */
+    @Override
+    public boolean shouldFilter() {
+        // 获取 RequestContext 对象
+        RequestContext requestContext = RequestContext.getCurrentContext();
+
+        // 获取 Request 对象
+        HttpServletRequest request = requestContext.getRequest();
+
+        // 判断当前请求参数是否为 signal=hello
+        String parameter = request.getParameter("signal");
+
+        return "hello".equals(parameter);
+    }
+
+    @Override
+    public Object run() throws ZuulException {
+
+        logger.info("当前请求要进行过滤, run() 方法执行了");
+
+        // Current implementation ignores it.
+        // 当前实现会忽略这个方法的返回值, 所以返回 null, 不做特殊处理
+        return null;
+    }
+}
+```
+
+- 测试: `http://localhost:9000/xigua/atguigu/zuul-emp/feign/consumer/test/fallback?signal=hello`
+
+![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660703073505-0cbaaaee-bcd7-4b6d-ab4c-289dd2b9f092.png)
