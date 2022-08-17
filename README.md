@@ -68,6 +68,10 @@
       - [3.3.6 加一个 `context-path`](#336-加一个-context-path)
     - [3.4 `ZuulFilter` 过滤器功能](#34-zuulfilter-过滤器功能)
       - [3.4.1 使用 `ZuulFilter`](#341-使用-zuulfilter)
+  - [4 `SpringCloud` 小结](#4-springcloud-小结)
+    - [4.1 `SpringBoot` 和 `SpringCloud` 关系](#41-springboot-和-springcloud-关系)
+    - [4.2 `SpringCloud` 和 `Dubbo` 对比](#42-springcloud-和-dubbo-对比)
+    - [4.3 开发业务功能相关程度](#43-开发业务功能相关程度)
 
 # 十四 SpringCloud
 
@@ -1910,3 +1914,36 @@ public class MyZuulFilter extends ZuulFilter {
 - 测试: `http://localhost:9000/xigua/atguigu/zuul-emp/feign/consumer/test/fallback?signal=hello`
 
 ![img](https://cdn.nlark.com/yuque/0/2022/png/12811585/1660703073505-0cbaaaee-bcd7-4b6d-ab4c-289dd2b9f092.png)
+
+## 4 `SpringCloud` 小结
+
+### 4.1 `SpringBoot` 和 `SpringCloud` 关系
+
+- `SpringBoot` 是基础
+- `SpringCloud` 要基于 `SpringBoot` 开发
+
+
+
+### 4.2 `SpringCloud` 和 `Dubbo` 对比
+
+- 核心
+
+  - `Dubbo` 底层基于 `RPC`
+  - `SpringCloud` 底层基于 `RestFul`, 也可以说是基于 `HTTP`
+
+- 其他区别
+
+  - `SpringCloud` 相对于 `Dubbo` 功能更全面
+  - `SpringCloud` 是一个一站式解决方案
+  - `SpringCloud` 能够天然的基于 `Spring` 全家桶开发
+
+
+
+### 4.3 开发业务功能相关程度
+
+| `Eureka`  | ※※※※※ |
+| --------- | ----- |
+| `Rubbon`  | ※※※   |
+| `Feign`   | ※※※※※ |
+| `Hystrix` | ※※※   |
+| `Zuul`    | ※※※※※ |
