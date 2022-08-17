@@ -72,6 +72,8 @@
     - [4.1 `SpringBoot` 和 `SpringCloud` 关系](#41-springboot-和-springcloud-关系)
     - [4.2 `SpringCloud` 和 `Dubbo` 对比](#42-springcloud-和-dubbo-对比)
     - [4.3 开发业务功能相关程度](#43-开发业务功能相关程度)
+  - [5. 确保 `github` 上项目结构的完整](#5-确保-github-上项目结构的完整)
+  
 
 # 十四 SpringCloud
 
@@ -1947,3 +1949,13 @@ public class MyZuulFilter extends ZuulFilter {
 | `Feign`   | ※※※※※ |
 | `Hystrix` | ※※※   |
 | `Zuul`    | ※※※※※ |
+
+## 5. 确保 `github` 上项目结构的完整
+
+```bash
+find . \( -type d -empty \) -exec touch {}/.gitxxx \;
+git status
+git add .
+git commit -m '项目结构'
+git push
+```
